@@ -1,129 +1,192 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Todo from './components/Todo';
 import Form from './components/Form';
 import FilterButton from './components/FilterButton';
-import {nanoid} from 'nanoid';
+import { nanoid } from 'nanoid';
 
-const FILTER_MAP={
 
-   All:()=>true,
-   Active:(task)=>!task.completed,
-   Completed:(task)=>task.completed
-};
+const FILTER_NAMES = ['All','Active','Completed'];
+function App() {
 
-const FILTER_NAMES=Object.keys(FILTER_MAP);
-function App(props) {
 
-    
-    const [tasks,setTasks]=useState(props.tasks)
-    const [filter,setFilter]=useState('All');
-   
-    
-     const filterList=FILTER_NAMES.map((name)=>{
+  const [tasks, setTasks] = useState([])
+  // const [filter, setFilter] = useState('All');
+  const [tabs,setTabs]=useState('All')
 
-        return <FilterButton 
-        key={name} 
-        name={name}
-        isPressed={name===filter}
-        setFilter={setFilter}
-        />
-     })
-  function addTask(task){
 
-    const newTask={
-      id: `todo-${nanoid()}`, 
-      name:task, 
-      completed: false
-    }
+  useEffect(() => {
+    fetch('http://localhost:3001/')
+      .then(response => response.json())
+      .then(data => setTasks(data));
 
-      setTasks([...tasks,newTask]);
-     
- }
-   function toggleTaskCompleted(id){
+  }, [])
+
+
+  function addTask(task) {
+
+      const newtask={
+        task:task
+      }
+    fetch('http://localhost:3001/addtask',{
+        method:"POST",
+        headers:{
+          'Content-Type':'application/json'
+        },
+        body:JSON.stringify(newtask)
+
+    })
+    .then(response => 
+      
+      {  
+         console.log(response);
+        return response.json()
+      })
+    .then(data=>
+      {
+         console.log(data);
        
-      const updatedTasks = tasks.map((task)=>{
+        if(data==='Error')
+         alert("Duplicate Tasks or Empty tasks are not allowed");
 
-           if(id===task.id)
-            {
-              return {
-                ...task,completed:!task.completed
-              }
-            }
+         else
+         setTasks(data);
+     
+    });
+      
+  }
 
-             return task;
-       })
+  function toggleTaskCompleted(id,completed) {
 
-        setTasks(updatedTasks);
-   }
-
-    function deleteTask(id){
-
-         const remainingTasks=tasks.filter(item=>{
-
-            return id!==item.id;
+      fetch(`http://localhost:3001/toggleTask`,{
+         method:"PATCH",
+         headers:{
+          'Content-Type':'application/json'
+         },
+         body:JSON.stringify({
+           id:id,
+           completed:!completed
          })
+      
+      })
+      .then(response=>response.json())
+      .then(data=>setTasks(data))
+}
 
-          setTasks(remainingTasks);
-       
-    }
+  function deleteTask(id) {
 
-     function editTask(id,newName){
-  
-        const editedTasks=tasks.map(task=>{
+        console.log(id);
+        fetch(`http://localhost:3001/deletetask/${id}`,{
+          method:"DELETE",
 
-             if(id===task.id){
-              
-                const newTask={
-
-                    ...task,
-                    name:newName
-                     
-                }
-                //  console.log(newTask);
-             return newTask;
-             }
-
-             return task;
         })
-          
+        .then(response=>response.json())
+        .then(data=>setTasks(data));
 
-         setTasks(editedTasks);
-        
+  }
 
-     }
+  function editTask(id, newName) {
+
+       console.log(newName);
      
+     fetch('http://localhost:3001/editask',{
+
+          method:"PATCH",
+          headers:{
+            'Content-Type':'application/json'
+          },
+          body:JSON.stringify({
+              id:id,
+              newTask:newName,
+              
+          })
+           
+     }).then(response=>response.json())
+       .then(data=>
+        {
+          console.log(data);
+
+            if(data==='Error')
+            alert("Task already exists");
+        else
+        setTasks(data)
+        
+       });
+
+  }
+
+  function fetchTask(name){
+
+    console.log(name)
+  
+         fetch(`http://localhost:3001/fetchTask/${name}`,{
+             method:"GET",
+             headers:{
+              'Content-Type':'application/json'
+             }   
+         })
+         .then(response=>response.json())
+         .then(data=>setTasks(data));
+
+  }
+
+
+  const filterList = FILTER_NAMES.map((name) => {
+
+    return <FilterButton
+      key={name}
+      name={name}
+      isPressed={name === tabs}
+      setTabs={setTabs}
+      fetchTask={fetchTask}
+
+      
+    />
+  })
+
+
+  const tasklist = tasks.filter((task)=>{
  
+          if(tabs==='Active'){
+            return !task.completed;
+          }
 
-    const tasklist=tasks.filter(FILTER_MAP[filter]).map(task=>{
-    return    <Todo 
-               id={task.id}
-               name={task.name} 
-               completed={task.completed} 
-               key={task.id} 
-               toggleTaskCompleted={toggleTaskCompleted} 
-               deleteTask={deleteTask}
-               editTask={editTask}
-               />
-})
+           else if(tabs==='Completed'){
+            return task.completed;
+           }
 
-  const headingText=`${tasklist.length} tasks remaining`;
+           else
+           return true;
+
+  }).map(task => {
+    return <Todo
+      id={task.id}
+      name={task.task}
+      completed={task.completed}
+      key={task.id}
+      toggleTaskCompleted={toggleTaskCompleted}
+      deleteTask={deleteTask}
+      editTask={editTask}
+    />
+  })
+
+  const headingText = `${tasklist.length} tasks remaining`;
   return (
     <div className="todoapp stack-large">
       <h1>TodoList</h1>
-      <Form addTask={addTask}/>
+      <Form addTask={addTask} />
       <div className="filters btn-group stack-exception">
-        
+
         {filterList}
-        
+
       </div>
       <h2 id="list-heading">{headingText}</h2>
       <ul
         role="list"
         className="todo-list stack-large stack-exception"
         aria-labelledby="list-heading">
-      
-           {tasklist}
-      
+
+        {tasklist}
+
       </ul>
     </div>
   );
